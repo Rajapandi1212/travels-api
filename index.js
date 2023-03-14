@@ -1,48 +1,38 @@
 const express = require("express");
-const cors = require("cors");
+const { PORT } = require("./config");
 const mongoose = require("mongoose");
+const connectDB = require("./utils/connectDB");
+const errorHandler = require("./error_handlers/errorHandler");
+const {
+  NotFoundError,
+  CustomError,
+} = require("./error_handlers/customErrors");
+const requestMiddleware = require("./middlewares/requestMiddleware");
 const app = express();
+app.use(requestMiddleware);
 
-//Allowing cors
-app.use(
-  cors({
-    origin: true,
-    credentials: true,
-    exposedHeaders: ["set-cookie"],
-  })
-);
-//Body parser
-app.use(express.json({ limit: "50mb" }));
-app.use(
-  express.urlencoded({
-    limit: "50mb",
-    extended: true,
-    parameterLimit: 500000,
-  })
-);
-
-mongoose.connect("mongodb://127.0.0.1:27017/Travels", {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
-
+//Connect to MongoDB
+connectDB();
 const db = mongoose.connection;
-
 db.on("error", console.error.bind(console, "Connection Error :"));
 
-db.once("open", () => console.log("MongoDB Connected"));
-
-app.get("/", (req, res) => res.send("Welcome to backend!"));
-
+app.get("/", (req, res) => res.send("Hello World!"));
+// app.get("/error", (req, res, next) => {
+//   const error = new CustomError(`Error in request at ${req.path}`);
+//   error.statusCode = 400;
+//   next(error);
+// });
+app.get("/favicon.ico", (req, res) => res.status(204).json());
 app.use((req, res, next) => {
-  res.status(404).send("The requested page does not exist");
+  const message = "Request not found";
+  const err = new NotFoundError(`${message} for path ${req.path}`);
+  next(err);
 });
+app.use(errorHandler);
 
-app.listen(8000, () => console.log("Server listening on 8000"));
-
-process.on("SIGINT", () => {
-  db.close(() => {
-    console.log("Mongoose Connection disconnected through app termination");
-    process.exit(0);
-  });
-});
+//Make sure our server is listen after sucessfully connected with mongodb
+db.once("open", () =>
+  app.listen(PORT, () =>
+    console.info(`Example app listening on http://localhost:${PORT}`)
+  )
+);
